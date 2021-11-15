@@ -7,6 +7,9 @@
 #include <string>
 #include <vector>
 
+using std::string;
+using std::vector;
+
 #define strequal(_Str1, _Str2) !strcmp(_Str1, _Str2)
 
 typedef int8_t int8;
@@ -25,9 +28,6 @@ typedef int32 bool32;
 
 typedef uintptr_t uintptr;
 typedef ptrdiff_t ptrdiff;
-
-using std::string;
-using std::vector;
 
 vector<string> ignore_exts;
 vector<string> files;
@@ -55,9 +55,9 @@ static void fill_ignore_exts(char *ignore_file_name)
 
 		fclose(file);
 
+#ifdef _DEBUG
 		printf("ignoring %u extensions\n", ignore_exts.size());
 
-#ifdef _DEBUG
 		for (size_t i = 0; i < ignore_exts.size(); i++)
 		{
 			printf("%s\n", ignore_exts.at(i).c_str());
@@ -70,7 +70,7 @@ static void fill_ignore_exts(char *ignore_file_name)
 	}
 }
 
-static bool32 ext_in_ignore_list(const char *path)
+static const char *get_ext(const char *path)
 {
 	const char *ext = strrchr(path, '.');
 
@@ -78,12 +78,32 @@ static bool32 ext_in_ignore_list(const char *path)
 	{
 		ext++;
 
-		for (size_t i = 0; i < ignore_exts.size(); i++)
+		return ext;
+	}
+
+	return "";
+}
+
+static bool32 ext_in_ignore_list(const char *ext)
+{
+	for (auto it = ignore_exts.begin(); it != ignore_exts.end(); it++)
+	{
+		if (*it == ext)
 		{
-			if (ignore_exts.at(i) == ext)
-			{
-				return TRUE;
-			}
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+static bool32 ext_in_list(string &ext_path)
+{
+	for (auto it = files.rbegin(); it != files.rend(); it++)
+	{
+		if (*it == ext_path)
+		{
+			return TRUE;
 		}
 	}
 
@@ -106,17 +126,30 @@ static void fill_files(const char *search_dir)
 	{
 		if (!strequal(fd.cFileName, ".") && !strequal(fd.cFileName, ".."))
 		{
-			string full_path = string(search_dir) + "\\" + fd.cFileName;
-
 			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 			{
+				string full_path = string(search_dir) + "\\" + fd.cFileName;
+
 				fill_files(full_path.c_str());
 			}
 			else
 			{
-				if (!ext_in_ignore_list(full_path.c_str()))
+				const char *ext = get_ext(fd.cFileName);
+
+				if (!*ext)
 				{
+					string full_path = string(search_dir) + "\\" + fd.cFileName;
+
 					files.push_back(full_path);
+				}
+				else if (!ext_in_ignore_list(ext))
+				{
+					string ext_path = string(search_dir) + "\\*." + ext;
+
+					if (!ext_in_list(ext_path))
+					{
+						files.push_back(ext_path);
+					}
 				}
 			}
 		}
@@ -144,8 +177,28 @@ static bool32 is_directory(char *path)
 	return FALSE;
 }
 
-static char *compact_exe_args;
-static size_t compact_exe_args_alloc;
+static void create_process(char *cmd_line)
+{
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	ZeroMemory(&pi, sizeof(pi));
+
+	si.cb = sizeof(si);
+	si.dwFlags |= STARTF_USESTDHANDLES;
+	si.hStdInput = NULL;
+	si.hStdError = NULL;
+	si.hStdOutput = NULL;
+
+	if (CreateProcess(NULL, cmd_line, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+	{
+		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	}
+}
 
 enum PROG_ARGS
 {
@@ -185,21 +238,20 @@ int32 main(int32 argc, char **argv)
 		fill_files(argv[ARG_FILE_OR_FOLDER]);
 	}
 
-	if (!files.size() && !ext_in_ignore_list(argv[ARG_FILE_OR_FOLDER]))
+	if (!files.size() && !ext_in_ignore_list(get_ext(argv[ARG_FILE_OR_FOLDER])))
 	{
-		files.push_back(argv[ARG_FILE_OR_FOLDER]);
+		files.push_back(string(argv[ARG_FILE_OR_FOLDER]));
 	}
 
-	printf("%s %u files\n", compacting ? "compacting" : "uncompacting", files.size());
-	printf("\n");
-
+	char *compact_exe_args = NULL;
+	size_t compact_exe_args_alloc = 0;
 	string compact_default_args = string("compact.exe") + " " + (compacting ? "/Q /C /I /EXE:XPRESS16K" : "/Q /U /I /EXE");
 
-	for (size_t i = 0; i < files.size(); i++)
+	for (auto it = files.begin(); it != files.end(); it++)
 	{
-		puts(files.at(i).c_str());
+		puts((*it).c_str());
 
-		string compact_exe_args_tmp = compact_default_args + " " + files.at(i);
+		string compact_exe_args_tmp = compact_default_args + " " + *it;
 
 		if (compact_exe_args_alloc < compact_exe_args_tmp.length())
 		{
@@ -211,29 +263,10 @@ int32 main(int32 argc, char **argv)
 
 		strcpy(compact_exe_args, compact_exe_args_tmp.c_str());
 
-		STARTUPINFO si;
-		PROCESS_INFORMATION pi;
-
-		ZeroMemory(&si, sizeof(si));
-		ZeroMemory(&pi, sizeof(pi));
-
-		si.cb = sizeof(si);
-		si.dwFlags |= STARTF_USESTDHANDLES;
-		si.hStdInput = NULL;
-		si.hStdError = NULL;
-		si.hStdOutput = NULL;
-
-		if (CreateProcess(NULL, compact_exe_args, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
-		{
-			WaitForSingleObject(pi.hProcess, INFINITE);
-
-			CloseHandle(pi.hProcess);
-			CloseHandle(pi.hThread);
-		}
+		create_process(compact_exe_args);
 	}
 
 	free(compact_exe_args);
-	compact_exe_args_alloc = 0;
 
 	return 0;
 }
