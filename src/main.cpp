@@ -63,7 +63,7 @@ static void fill_ignore_exts()
 		fclose(file);
 
 #ifdef _DEBUG
-		printf("ignoring %u extensions\n", ignore_exts.size());
+		printf("ignoring %zu extensions\n", ignore_exts.size());
 
 		for (size_t i = 0; i < ignore_exts.size(); i++)
 		{
@@ -122,7 +122,7 @@ static bool32 path_contains_git(const char *path)
 	return strstr(path, "\\.git\\") != NULL;
 }
 
-static void fill_files(const char *search_dir)
+static void fill_files(const char *search_dir, bool only_ignore)
 {
 	static size_t start = 0;
 
@@ -146,7 +146,7 @@ static void fill_files(const char *search_dir)
 
 				if (files.size()) start = files.size() - 1;
 
-				fill_files(full_path.c_str());
+				fill_files(full_path.c_str(), only_ignore);
 			}
 			else
 			{
@@ -156,7 +156,7 @@ static void fill_files(const char *search_dir)
 				{
 					if (*ext)
 					{
-						if (!ext_in_ignore_list(ext))
+						if ((!only_ignore && !ext_in_ignore_list(ext)) || (only_ignore && ext_in_ignore_list(ext)))
 						{
 							string ext_path = string(search_dir) + "\\*." + ext;
 
@@ -231,6 +231,13 @@ enum
 	ARG_OPT_COMP_MODE = NUM_ARGS
 };
 
+enum MODE
+{
+	COMPACTING,
+	UNCOMPACTING,
+	UNCOMPACTING_IGNORE,
+};
+
 #define USAGE \
 "usage: compactxf c/u/i file/folder [4/8/16/lzx]\n" \
 "c for compacting, u for uncompacting, i for uncompacting files in ignore list\n" \
@@ -245,16 +252,20 @@ int32 main(int32 argc, char **argv)
 		return 1;
 	}
 
-	bool32 compacting;
+	MODE mode;
 
 	switch (*argv[ARG_PROG_MODE])
 	{
 	case 'c':
-		compacting = TRUE;
+		mode = COMPACTING;
 		break;
 
 	case 'u':
-		compacting = FALSE;
+		mode = UNCOMPACTING;
+		break;
+
+	case 'i':
+		mode = UNCOMPACTING_IGNORE;
 		break;
 
 	default:
@@ -265,7 +276,7 @@ int32 main(int32 argc, char **argv)
 	char *compact_exe_args = NULL;
 	size_t compact_exe_args_alloc = 0;
 
-	if (compacting)
+	if (mode == COMPACTING)
 	{
 		string level = "XPRESS16K";
 
@@ -302,7 +313,7 @@ int32 main(int32 argc, char **argv)
 
 		if (is_directory(argv[ARG_FILE_OR_FOLDER]))
 		{
-			fill_files(argv[ARG_FILE_OR_FOLDER]);
+			fill_files(argv[ARG_FILE_OR_FOLDER], false);
 		}
 		else if (!ext_in_ignore_list(get_ext(argv[ARG_FILE_OR_FOLDER])))
 		{
@@ -330,7 +341,7 @@ int32 main(int32 argc, char **argv)
 			create_process(compact_exe_args);
 		}
 	}
-	else
+	else if (mode == UNCOMPACTING)
 	{
 		bool32 is_dir = is_directory(argv[ARG_FILE_OR_FOLDER]);
 
@@ -346,6 +357,40 @@ int32 main(int32 argc, char **argv)
 		puts(path.c_str());
 
 		create_process(compact_exe_args);
+	}
+	else // mode == UNCOMPACTING_IGNORE
+	{
+		fill_ignore_exts();
+
+		if (is_directory(argv[ARG_FILE_OR_FOLDER]))
+		{
+			fill_files(argv[ARG_FILE_OR_FOLDER], true);
+		}
+		else if (ext_in_ignore_list(get_ext(argv[ARG_FILE_OR_FOLDER])))
+		{
+			files.push_back(string(argv[ARG_FILE_OR_FOLDER]));
+		}
+
+		string compact_default_args = string("compact.exe") + " " + "/Q /U /I";
+
+		for (size_t i = 0; i < files.size(); i++)
+		{
+			string compact_exe_args_tmp = compact_default_args + " " + files.at(i);
+
+			if (compact_exe_args_alloc < compact_exe_args_tmp.length())
+			{
+				free(compact_exe_args);
+
+				compact_exe_args_alloc = compact_exe_args_tmp.length() + 1 + 2048;
+				compact_exe_args = (char *)calloc(compact_exe_args_alloc, 1);
+			}
+
+			strcpy(compact_exe_args, compact_exe_args_tmp.c_str());
+
+			puts(files.at(i).c_str());
+
+			create_process(compact_exe_args);
+		}
 	}
 
 	free(compact_exe_args);
