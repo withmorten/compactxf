@@ -24,9 +24,6 @@ typedef uint64_t uint64;
 
 typedef uint8 byte;
 
-typedef uint8 bool8;
-typedef int32 bool32;
-
 typedef uintptr_t uintptr;
 typedef ptrdiff_t ptrdiff;
 
@@ -91,33 +88,33 @@ static const char *get_ext(const char *path)
 	return "";
 }
 
-static bool32 ext_in_ignore_list(const char *ext)
+static bool ext_in_ignore_list(const char *ext)
 {
 	for (size_t i = 0; i < ignore_exts.size(); i++)
 	{
 		if (striequal(ignore_exts.at(i).c_str(), ext))
 		{
-			return TRUE;
+			return true;
 		}
 	}
 
-	return FALSE;
+	return false;
 }
 
-static bool32 ext_in_list(size_t start, string &ext_path)
+static bool ext_in_list(size_t start, string &ext_path)
 {
 	for (size_t i = start; i < files.size(); i++)
 	{
 		if (striequal(files.at(i).c_str(), ext_path.c_str()))
 		{
-			return TRUE;
+			return true;
 		}
 	}
 
-	return FALSE;
+	return false;
 }
 
-static bool32 path_contains_git(const char *path)
+static bool path_contains_git(const char *path)
 {
 	return strstr(path, "\\.git\\") != NULL;
 }
@@ -181,7 +178,7 @@ static void fill_files(const char *search_dir, bool only_ignore)
 	FindClose(h);
 }
 
-static bool32 is_directory(char *path)
+static bool is_directory(char *path)
 {
 	WIN32_FIND_DATA fd;
 	HANDLE h = FindFirstFile(path, &fd);
@@ -196,7 +193,7 @@ static bool32 is_directory(char *path)
 	printf("the input path couldn't be found: %s\n", path);
 	exit(1);
 
-	return FALSE;
+	return false;
 }
 
 static void create_process(char *cmd_line)
@@ -343,7 +340,7 @@ int32 main(int32 argc, char **argv)
 	}
 	else if (mode == UNCOMPACTING)
 	{
-		bool32 is_dir = is_directory(argv[ARG_FILE_OR_FOLDER]);
+		bool is_dir = is_directory(argv[ARG_FILE_OR_FOLDER]);
 
 		string path = string(argv[ARG_FILE_OR_FOLDER]) + (is_dir ? "\\*.*" : "");
 
