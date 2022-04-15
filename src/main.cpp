@@ -202,6 +202,28 @@ static void create_process(char *cmd_line)
 	}
 }
 
+static void process_files(vector<string> &files, string &compact_default_args, char *&compact_exe_args, size_t &compact_exe_args_alloc)
+{
+	for (size_t i = 0; i < files.size(); i++)
+	{
+		string compact_exe_args_tmp = compact_default_args + " " + files.at(i);
+
+		if (compact_exe_args_alloc < compact_exe_args_tmp.length())
+		{
+			free(compact_exe_args);
+
+			compact_exe_args_alloc = compact_exe_args_tmp.length() + 1 + 2048;
+			compact_exe_args = (char *)calloc(compact_exe_args_alloc, 1);
+		}
+
+		strcpy(compact_exe_args, compact_exe_args_tmp.c_str());
+
+		puts(files.at(i).c_str());
+
+		create_process(compact_exe_args);
+	}
+}
+
 enum
 {
 	ARG_PROG_NAME = 0,
@@ -305,24 +327,7 @@ int main(int argc, char **argv)
 
 		string compact_default_args = string("compact.exe") + " " + "/Q /C /I /EXE:" + level;
 
-		for (size_t i = 0; i < files.size(); i++)
-		{
-			string compact_exe_args_tmp = compact_default_args + " " + files.at(i);
-
-			if (compact_exe_args_alloc < compact_exe_args_tmp.length())
-			{
-				free(compact_exe_args);
-
-				compact_exe_args_alloc = compact_exe_args_tmp.length() + 1 + 2048;
-				compact_exe_args = (char *)calloc(compact_exe_args_alloc, 1);
-			}
-
-			strcpy(compact_exe_args, compact_exe_args_tmp.c_str());
-
-			puts(files.at(i).c_str());
-
-			create_process(compact_exe_args);
-		}
+		process_files(files, compact_default_args, compact_exe_args, compact_exe_args_alloc);
 	}
 	else if (mode == UNCOMPACTING)
 	{
@@ -356,24 +361,7 @@ int main(int argc, char **argv)
 
 		string compact_default_args = string("compact.exe") + " " + "/Q /U /I";
 
-		for (size_t i = 0; i < files.size(); i++)
-		{
-			string compact_exe_args_tmp = compact_default_args + " " + files.at(i);
-
-			if (compact_exe_args_alloc < compact_exe_args_tmp.length())
-			{
-				free(compact_exe_args);
-
-				compact_exe_args_alloc = compact_exe_args_tmp.length() + 1 + 2048;
-				compact_exe_args = (char *)calloc(compact_exe_args_alloc, 1);
-			}
-
-			strcpy(compact_exe_args, compact_exe_args_tmp.c_str());
-
-			puts(files.at(i).c_str());
-
-			create_process(compact_exe_args);
-		}
+		process_files(files, compact_default_args, compact_exe_args, compact_exe_args_alloc);
 	}
 
 	free(compact_exe_args);
