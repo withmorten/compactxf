@@ -13,20 +13,6 @@ using std::vector;
 #define strequal(_Str1, _Str2) !strcmp(_Str1, _Str2)
 #define striequal(_Str1, _Str2) !stricmp(_Str1, _Str2)
 
-typedef int8_t int8;
-typedef uint8_t uint8;
-typedef int16_t int16;
-typedef uint16_t uint16;
-typedef int32_t int32;
-typedef uint32_t uint32;
-typedef int64_t int64;
-typedef uint64_t uint64;
-
-typedef uint8 byte;
-
-typedef uintptr_t uintptr;
-typedef ptrdiff_t ptrdiff;
-
 static vector<string> ignore_exts;
 static vector<string> files;
 
@@ -240,7 +226,7 @@ enum MODE
 "c for compacting, u for uncompacting, i for uncompacting files in ignore list\n" \
 "4 = XPRESS4K, 8 = XPRESS8K, 16 = XPRESS16K, lzx = LZX (ignored when uncompacting)\n"
 
-int32 main(int32 argc, char **argv)
+int main(int argc, char **argv)
 {
 	if (argc < NUM_ARGS)
 	{
