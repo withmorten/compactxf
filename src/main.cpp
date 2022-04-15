@@ -13,10 +13,7 @@ using std::vector;
 #define strequal(_Str1, _Str2) !strcmp(_Str1, _Str2)
 #define striequal(_Str1, _Str2) !stricmp(_Str1, _Str2)
 
-static vector<string> ignore_exts;
-static vector<string> files;
-
-static void fill_ignore_exts()
+static void fill_ignore_exts(vector<string> &ignore_exts)
 {
 	char module_path[MAX_PATH];
 	GetModuleFileName(NULL, module_path, sizeof(module_path));
@@ -74,7 +71,7 @@ static const char *get_ext(const char *path)
 	return "";
 }
 
-static bool ext_in_ignore_list(const char *ext)
+static bool ext_in_ignore_list(vector<string> &ignore_exts, const char *ext)
 {
 	for (size_t i = 0; i < ignore_exts.size(); i++)
 	{
@@ -87,7 +84,7 @@ static bool ext_in_ignore_list(const char *ext)
 	return false;
 }
 
-static bool ext_in_list(size_t start, string &ext_path)
+static bool ext_in_list(vector<string> &files, size_t start, string &ext_path)
 {
 	for (size_t i = start; i < files.size(); i++)
 	{
@@ -105,7 +102,7 @@ static bool path_contains_git(const char *path)
 	return strstr(path, "\\.git\\") != NULL;
 }
 
-static void fill_files(const char *search_dir, bool only_ignore)
+static void fill_files(vector<string> &files, vector<string> &ignore_exts, const char *search_dir, bool only_ignore)
 {
 	static size_t start = 0;
 
@@ -129,7 +126,7 @@ static void fill_files(const char *search_dir, bool only_ignore)
 
 				if (files.size()) start = files.size() - 1;
 
-				fill_files(full_path.c_str(), only_ignore);
+				fill_files(files, ignore_exts, full_path.c_str(), only_ignore);
 			}
 			else
 			{
@@ -139,11 +136,11 @@ static void fill_files(const char *search_dir, bool only_ignore)
 				{
 					if (*ext)
 					{
-						if ((!only_ignore && !ext_in_ignore_list(ext)) || (only_ignore && ext_in_ignore_list(ext)))
+						if ((!only_ignore && !ext_in_ignore_list(ignore_exts, ext)) || (only_ignore && ext_in_ignore_list(ignore_exts, ext)))
 						{
 							string ext_path = string(search_dir) + "\\*." + ext;
 
-							if (!ext_in_list(start, ext_path))
+							if (!ext_in_list(files, start, ext_path))
 							{
 								files.push_back(ext_path);
 							}
@@ -259,6 +256,9 @@ int main(int argc, char **argv)
 	char *compact_exe_args = NULL;
 	size_t compact_exe_args_alloc = 0;
 
+	vector<string> ignore_exts;
+	vector<string> files;
+
 	if (mode == COMPACTING)
 	{
 		string level = "XPRESS16K";
@@ -292,13 +292,13 @@ int main(int argc, char **argv)
 		printf("compressing with %s\n", level.c_str());
 #endif
 
-		fill_ignore_exts();
+		fill_ignore_exts(ignore_exts);
 
 		if (is_directory(argv[ARG_FILE_OR_FOLDER]))
 		{
-			fill_files(argv[ARG_FILE_OR_FOLDER], false);
+			fill_files(files, ignore_exts, argv[ARG_FILE_OR_FOLDER], false);
 		}
-		else if (!ext_in_ignore_list(get_ext(argv[ARG_FILE_OR_FOLDER])))
+		else if (!ext_in_ignore_list(ignore_exts, get_ext(argv[ARG_FILE_OR_FOLDER])))
 		{
 			files.push_back(string(argv[ARG_FILE_OR_FOLDER]));
 		}
@@ -343,13 +343,13 @@ int main(int argc, char **argv)
 	}
 	else // mode == UNCOMPACTING_IGNORE
 	{
-		fill_ignore_exts();
+		fill_ignore_exts(ignore_exts);
 
 		if (is_directory(argv[ARG_FILE_OR_FOLDER]))
 		{
-			fill_files(argv[ARG_FILE_OR_FOLDER], true);
+			fill_files(files, ignore_exts, argv[ARG_FILE_OR_FOLDER], true);
 		}
-		else if (ext_in_ignore_list(get_ext(argv[ARG_FILE_OR_FOLDER])))
+		else if (ext_in_ignore_list(ignore_exts, get_ext(argv[ARG_FILE_OR_FOLDER])))
 		{
 			files.push_back(string(argv[ARG_FILE_OR_FOLDER]));
 		}
